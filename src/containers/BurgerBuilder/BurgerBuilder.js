@@ -9,15 +9,13 @@ import Modal from '../../components/ui/Modal/Modal'
 import OrderSummary from '../../components/Burger/OrderSummary/OrderSummary'
 import Spinner from '../../components/ui/Spinner/Spinner'
 import withErrorHandler from '../../hoc/withErrorHandler/withErrorHandler'
-import * as actionTypes from '../../store/actions'
+import * as actionCreators from '../../store/actions/index'
 
 
 class BurgerBuilder extends Component {
 
     state = {
         purchasing: false,
-        loading: false,
-        error: false
     }
 
     updatePurchasable = (ingredients) => {
@@ -33,18 +31,18 @@ class BurgerBuilder extends Component {
     }
 
     componentDidMount() {
-        let self = this;
-        axios.get("https://react-my-burger-80991.firebaseio.com/ingredients.json")
-            .then(response => {
-                return self.props.onIngredientsLoad(response.data);
-            })
-            .catch(error => {this.setState({error: true})})
-        
+        this.props.onIngredientsLoad();
     }
 
 
     purchaseHandler = () => {
-        this.setState({purchasing: true});
+        if(this.props.isAuthenticated) {
+            this.setState({purchasing: true});
+        } else {
+            this.props.onSetAuthRedirectPath('/checkout')
+            this.props.history.push('/auth');
+        }
+        
     }
 
     purchaseCancelHandler = () => {
@@ -52,7 +50,7 @@ class BurgerBuilder extends Component {
     }
 
     purchaseContinueHandler = () => {
-
+        this.props.onPurchaseInit();
         this.props.history.push({
             pathname: '/checkout'
         });
@@ -69,13 +67,14 @@ class BurgerBuilder extends Component {
 
         let orderSummary = null;
 
-        let burger = this.state.error ? <p>Ingredients can't be loaded at this moment... </p> : <Spinner />
+        let burger = this.props.error ? <p>Ingredients can't be loaded at this moment... </p> : <Spinner />
 
         if(this.props.ingredients) {
             burger = (
                 <Aux>
                     <Burger ingredients={this.props.ingredients} />
                     <BuildControls 
+                        isAuth={this.props.isAuthenticated}
                         addIngredient={this.props.onAddIngredient}
                         removeIngredient={this.props.onRemoveIngredient}
                         disabled={disabledInfo}
@@ -108,16 +107,20 @@ class BurgerBuilder extends Component {
 
 const mapStateToProps = state => {
     return {
-        ingredients: state.ingredients,
-        totalPrice: state.totalPrice
+        ingredients: state.bgrBldr.ingredients,
+        totalPrice: state.bgrBldr.totalPrice,
+        error: state.bgrBldr.error,
+        isAuthenticated: state.auth.token !== null
     }
 }
 
 const mapDispatchToProps = dispatch => {
     return {
-        onIngredientsLoad: (defaultIngredients) => dispatch({type: actionTypes.LOAD_DEFAULT_INGREDIENTS, burger: {ingredients: defaultIngredients}}),
-        onAddIngredient: (ingredientType) => dispatch({ type: actionTypes.ADD_INGREDIENT, burger: {ingredientType: ingredientType} }),
-        onRemoveIngredient: (ingredientType) => dispatch({ type: actionTypes.REMOVE_INGREDIENT, burger: {ingredientType: ingredientType} })
+        onIngredientsLoad: () => dispatch(actionCreators.loadIngredients()),
+        onAddIngredient: (ingredientType) => dispatch(actionCreators.addIngredient(ingredientType)),
+        onRemoveIngredient: (ingredientType) => dispatch(actionCreators.removeIngredient(ingredientType)),
+        onPurchaseInit: () => dispatch(actionCreators.purchaseBurgerInit()),
+        onSetAuthRedirectPath: (path) => dispatch(actionCreators.setAuthRedirectPath(path))
     }
 }
 
